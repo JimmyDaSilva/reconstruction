@@ -37,7 +37,7 @@ def upload_mesh(db, session, cloud_file, mesh_file=None):
         with open(mesh_file, 'r') as mesh:
             db.put_attachment(m, mesh, filename='mesh.stl', content_type='application/octet-stream')
 
-FILTER_SCRIPT= '''
+FILTER_SCRIPT_POISSON= '''
 <!DOCTYPE FilterScript>
 <FilterScript>
  <filter name="Compute normals for point sets">
@@ -76,11 +76,14 @@ FILTER_SCRIPT_PIVOTING='''
 '''
 #meshlabserver -i cloud_44ed68c2b66cc8aefc7df45fd63c4ac8_00000.ply -o mug.stl -s meshlab.xml.mlx
 
-def meshlab(filename_in, filename_out):
+def meshlab(filename_in, filename_out, args):
     import subprocess
     f = NamedTemporaryFile(delete=False)
     script = f.name
-    f.write(FILTER_SCRIPT_PIVOTING)
+    if args.use_poisson_script:
+      f.write(FILTER_SCRIPT_POISSON)
+    else:
+      f.write(FILTER_SCRIPT_PIVOTING)
     f.close()
     env = os.environ
     env['LC_NUMERIC'] = 'C'
@@ -158,7 +161,7 @@ def simple_mesh_session(dbs, session, args):
     ply_name = os.path.join(dir_path, 'cloud_%s_%05d.ply' % (str(session.id), 0))
     ply_name = 'cloud_%s_%05d.ply' % (str(session.id), 0)
     mesh_name = os.path.join(dir_path, 'cloud_%s.stl' % str(session.id))
-    meshlab(ply_name, mesh_name)
+    meshlab(ply_name, mesh_name, args)
     if args.commit:
         upload_mesh(dbs, session, ply_name, mesh_name)
         shutil.rmtree(dir_path)
@@ -174,6 +177,9 @@ def parse_args():
     parser.add_argument('--visualize', dest='visualize', action='store_const',
                         const=True, default=False,
                         help='Turn on visualization')
+    parser.add_argument('--poisson-script', dest='use_poisson_script', action='store_const',
+                        const=True, default=False,
+                       help='Use the poisson reconstruction script instead')
     dbtools.add_db_arguments(parser)
 
     sched_group = parser.add_argument_group('Scheduler Options')
